@@ -1,0 +1,75 @@
+﻿@page "/privileges"
+
+@using QLESS.BlazorServerApp.Administrator.Data
+@using QLESS.Core.Entities
+@inject AdministratorService AdministratorService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JsRuntime
+
+<div class="mb-3">
+    <h3>Privileges</h3>
+    @if (Privileges == null)
+    {
+        <hr />
+        <p class="text-center"><em>Loading...</em></p>
+    }
+    else if (!Privileges.Any())
+    {
+        <hr />
+        <p class="text-center">No records found.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th />
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var privilege in Privileges)
+                {
+                    <tr>
+                        <td>@privilege.Name</td>
+                        <td>@privilege.Description</td>
+                        <td>
+                            <div class="text-right">
+                                <a class="edit" href="/privileges/@privilege.Id">Edit</a>
+                                &nbsp;
+                                <a class="delete" href="" @onclick="@(e =>DeletePrivilege(privilege))" @onclick:preventDefault>Delete</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    <hr />
+    <div class="col-md-12 text-right">
+        <button class="btn btn-primary" @onclick=@Navigate>Create new</button>
+    </div>
+</div>
+
+@code {
+    private Privilege[] Privileges;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Privileges = await AdministratorService.GetPrivilegesAsync();
+    }
+    private async Task DeletePrivilege(Privilege privilege)
+    {
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete '{privilege.Name}'?");
+        if (confirmed)
+        {
+            AdministratorService.DeletePrivilege(privilege.Id);
+            Privileges = await AdministratorService.GetPrivilegesAsync();
+        }
+    }
+    private void Navigate()
+    {
+        NavigationManager.NavigateTo("/privileges/create");
+    }
+}

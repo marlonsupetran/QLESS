@@ -1,0 +1,277 @@
+﻿@page "/card-types/new"
+@page "/card-types/{id:guid}"
+
+@using QLESS.BlazorServerApp.Administrator.Data
+@using QLESS.BlazorServerApp.Administrator.Models
+@using QLESS.BlazorServerApp.Administrator.Shared.Components
+@using QLESS.Core.Strategies
+@using QLESS.Core.BusinessRules
+@using QLESS.Core.Entities
+@using Microsoft.AspNetCore.Components.Forms
+@inject AdministratorService AdministratorService
+@inject AdministratorBusinessRules AdministratorBusinessRules
+@inject StrategyFactory StrategyFactory
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JsRuntime
+
+<div class="mb-3">
+    <h3>@(CardTypeModel.Id == Guid.Empty ? "Create New" : $"Edit") Card Type</h3>
+    <hr class="col-sm-8" align="left" />
+
+    <EditForm EditContext="@EditContext" OnValidSubmit="@Submit">
+        <DataAnnotationsValidator />
+
+        @if (Errors.Any())
+        {
+            <ul class="validation-errors">
+                @foreach (var error in Errors)
+                {
+                    <li class="validation-message">@error</li>
+                }
+            </ul>
+        }
+
+        <div class="form-group row">
+            <label for="name" class="col-sm-2 col-form-label">Name</label>
+            <div class="col-sm-6">
+                <InputText id="name"
+                           class="form-control"
+                           placeholder="Name"
+                           @bind-Value="CardTypeModel.Name" />
+                <ValidationMessage For="@(() => CardTypeModel.Name)"></ValidationMessage>
+            </div>
+        </div>
+        <div class="form-group row">
+            <label for="description" class="col-sm-2 col-form-label">Description</label>
+            <div class="col-sm-6">
+                <InputText id="description"
+                           class="form-control"
+                           placeholder="Description"
+                           @bind-Value="CardTypeModel.Description" />
+                <ValidationMessage For="@(() => CardTypeModel.Description)"></ValidationMessage>
+            </div>
+        </div>
+        <div class="form-group row">
+            <label for="baseFare" class="col-sm-2 col-form-label">Base Fare</label>
+            <div class="col-sm-2">
+                <InputNumber id="baseFare"
+                             class="form-control"
+                             placeholder="Base Fare"
+                             @bind-Value="CardTypeModel.BaseFare" />
+                <ValidationMessage For="@(() => CardTypeModel.BaseFare)"></ValidationMessage>
+            </div>
+        </div>
+        <div class="form-group row">
+            <label for="initialBalance" class="col-sm-2 col-form-label">Initial Balance</label>
+            <div class="col-sm-2">
+                <InputNumber id="initialBalance"
+                             class="form-control"
+                             placeholder="Initial Balance"
+                             @bind-Value="CardTypeModel.InitialBalance" />
+                <ValidationMessage For="@(() => CardTypeModel.InitialBalance)"></ValidationMessage>
+            </div>
+        </div>
+        <div class="form-group row">
+            <label for="validity" class="col-sm-2 col-form-label">Validity</label>
+            <div class="col-sm-4">
+                <InputSelectNumber id="validity"
+                                   class="form-control"
+                                   placeholder="Validity"
+                                   @bind-Value="CardTypeModel.Validity">
+                    <option value="@(0L)">Non-expiring</option>
+                    @foreach (var validityOption in AdministratorService.ValidityOptions)
+                    {
+                        <option value="@validityOption.Value">@validityOption.Key</option>
+                    }
+                </InputSelectNumber>
+                <ValidationMessage For="@(() => CardTypeModel.Validity)"></ValidationMessage>
+            </div>
+        </div>
+        <div class="form-group row">
+            <label for="fareScheme" class="col-sm-2 col-form-label">Fare Scheme</label>
+            <div class="col-sm-4">
+                <InputSelectGuid id="fareScheme"
+                                 class="form-control"
+                                 placeholder="fareScheme"
+                                 @bind-Value="CardTypeModel.FareStrategyId">
+                    <option value="@(Guid.Empty)">Select fare scheme</option>
+                    @foreach (var fareOption in FareOptions)
+                    {
+                        <option value="@fareOption.Value">@fareOption.Key</option>
+                    }
+                </InputSelectGuid>
+                <ValidationMessage For="@(() => CardTypeModel.FareStrategyId)"></ValidationMessage>
+            </div>
+        </div>
+        <div class="form-group row">
+            <label for="discountScheme" class="col-sm-2 col-form-label">Discount Scheme</label>
+            <div class="col-sm-4">
+                <InputSelectGuid id="discountScheme"
+                                 class="form-control"
+                                 placeholder="discountScheme"
+                                 @bind-Value="CardTypeModel.DiscountStrategyId">
+                    <option value="@(Guid.Empty)">No discount scheme</option>
+                    @foreach (var discountOption in DiscountOptions)
+                    {
+                        <option value="@discountOption.Value">@discountOption.Key</option>
+                    }
+                </InputSelectGuid>
+                <ValidationMessage For="@(() => CardTypeModel.DiscountStrategyId)"></ValidationMessage>
+            </div>
+        </div>
+
+        <hr class="col-sm-8" align="left" />
+
+        <fieldset>
+            <legend>Balance</legend>
+            <div class="form-group row">
+                <label for="minimumBalance" class="col-sm-2 col-form-label">Min</label>
+                <div class="col-sm-2">
+                    <InputNumber id="minimumBalance"
+                                 class="form-control"
+                                 placeholder="Min"
+                                 @bind-Value="CardTypeModel.MinimumBalance" />
+                    <ValidationMessage For="@(() => CardTypeModel.MinimumBalance)"></ValidationMessage>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="maximumBalance" class="col-sm-2 col-form-label">Max</label>
+                <div class="col-sm-2">
+                    <InputNumber id="maximumBalance"
+                                 class="form-control"
+                                 placeholder="Max"
+                                 @bind-Value="CardTypeModel.MaximumBalance" />
+                    <ValidationMessage For="@(() => CardTypeModel.MaximumBalance)"></ValidationMessage>
+                </div>
+            </div>
+        </fieldset>
+        <hr class="col-sm-8" align="left" />
+        <fieldset>
+            <legend>Reload Amount</legend>
+            <div class="form-group row">
+                <label for="minimumReloadAmount" class="col-sm-2 col-form-label">Min</label>
+                <div class="col-sm-2">
+                    <InputNumber id="minimumReloadAmount"
+                                 class="form-control"
+                                 placeholder="Min"
+                                 @bind-Value="CardTypeModel.MinimumReloadAmount" />
+                    <ValidationMessage For="@(() => CardTypeModel.MinimumReloadAmount)"></ValidationMessage>
+                </div>
+            </div>
+            <div class="form-group row">
+                <label for="maximumReloadAmount" class="col-sm-2 col-form-label">Max</label>
+                <div class="col-sm-2">
+                    <InputNumber id="maximumReloadAmount"
+                                 class="form-control"
+                                 placeholder="Max"
+                                 @bind-Value="CardTypeModel.MaximumReloadAmount" />
+                    <ValidationMessage For="@(() => CardTypeModel.MaximumReloadAmount)"></ValidationMessage>
+                </div>
+            </div>
+        </fieldset>
+
+        @if (PrivilegeOptions.Any())
+        {
+            <fieldset>
+                <legend>Accepted Privileges</legend>
+                @foreach (var privilegeOption in PrivilegeOptions)
+                {
+                    <div class="form-check">
+                        <InputCheckbox @bind-Value="privilegeOption.IsChecked"
+                                       class="form-check-input"
+                                       id="@($"privileges-{privilegeOption.Privilege.Id}")" />
+                        <label class="form-check-label" for="privileges-@privilegeOption.Privilege.Id">
+                            @privilegeOption.Privilege.Name
+                        </label>
+                    </div>
+                }
+            </fieldset>
+        }
+
+        <hr class="col-sm-8" align="left" />
+        <div class="col-md-8 text-right">
+            <button class="btn btn-primary" type="submit">@(CardTypeModel.Id == Guid.Empty ? "Submit" : "Save")</button>
+        </div>
+    </EditForm>
+</div>
+@code {
+    // Properties
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private EditContext EditContext { get; set; }
+    private CardTypeModel CardTypeModel { get; set; }
+    private List<KeyValuePair<string, Guid>> FareOptions { get; set; }
+    private List<KeyValuePair<string, Guid>> DiscountOptions { get; set; }
+    private List<PrivilegeOptionsModel> PrivilegeOptions { get; set; }
+    private List<String> Errors { get; set; }
+
+    // Methods
+    protected override async Task OnInitializedAsync()
+    {
+        CardTypeModel = new CardTypeModel()
+        {
+            DiscountStrategyId = Guid.Empty
+        };
+
+        if (Id != Guid.Empty)   
+        {
+            var cardType = await AdministratorService.GetCardType(Id);
+            CardTypeModel.Id = cardType.Id;
+            CardTypeModel.Name = cardType.Name;
+            CardTypeModel.Description = cardType.Description;
+            CardTypeModel.BaseFare = cardType.BaseFare;
+            CardTypeModel.InitialBalance = cardType.InitialBalance;
+            CardTypeModel.MinimumBalance = cardType.MinimumBalance;
+            CardTypeModel.MaximumBalance = cardType.MaximumBalance;
+            CardTypeModel.MinimumReloadAmount = cardType.MinimumReloadAmount;
+            CardTypeModel.MaximumReloadAmount = cardType.MaximumReloadAmount;
+            CardTypeModel.PrivilegeIds = cardType.Privileges.Any()
+                ? cardType.Privileges.Select(p => p.Id).ToList()
+                : new List<Guid>();
+            CardTypeModel.Validity = cardType.Validity;
+            CardTypeModel.FareStrategyId = cardType.FareStrategyId;
+            CardTypeModel.DiscountStrategyId = cardType.DiscountStrategyId;
+        }
+
+        EditContext = new EditContext(CardTypeModel);
+        Errors = new List<String>();
+        FareOptions = StrategyFactory.GetFareStrategies().ToList();
+        DiscountOptions = StrategyFactory.GetDiscountStrategies().ToList();
+        PrivilegeOptions = (await AdministratorService.GetPrivilegesAsync())
+            .Select(p => new PrivilegeOptionsModel(p, CardTypeModel.PrivilegeIds?.Contains(p.Id) ?? false))
+            .ToList();
+
+        base.OnInitialized();
+    }
+    private void Submit()
+    {
+        try
+        {
+            Errors.Clear();
+            CardTypeModel.PrivilegeIds = PrivilegeOptions
+                .Where(p => p.IsChecked)
+                .Select(p => p.Privilege.Id)
+                .ToList();
+            AdministratorBusinessRules.CreateOrEditCardType(CardTypeModel);
+            NavigationManager.NavigateTo("/card-types");
+        }
+        catch (Exception ex)
+        {
+            Errors.Add(ex.Message);
+        }
+    }
+
+    // Nested Types
+    class PrivilegeOptionsModel
+    {
+        public Privilege Privilege { get; set; }
+        public bool IsChecked { get; set; }
+
+        public PrivilegeOptionsModel(Privilege privilege, bool isChecked)
+        {
+            Privilege = privilege;
+            IsChecked = isChecked;
+        }
+    }
+}

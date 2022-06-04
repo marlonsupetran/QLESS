@@ -1,0 +1,217 @@
+﻿@page "/cards/activation"
+
+@using System.Text.RegularExpressions
+@using QLESS.BlazorServerApp.Administrator.Data
+@using QLESS.BlazorServerApp.Administrator.Shared.Components
+@using QLESS.Core.Data.EntityFramework 
+@using QLESS.Core.Entities
+@using QLESS.Core.BusinessRules
+@using Microsoft.AspNetCore.Components.Forms
+@inject EntityFrameworkDbContext EntityFrameworkDbContext
+@inject AdministratorService AdministratorService
+@inject TicketingBusinessRules TicketingBusinessRules
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JsRuntime
+
+<div class="mb-3">
+    <h3>Card Activation</h3>
+    <hr class="col-sm-8" align="left" />
+
+    @if (!CardTypeOptions.Any())
+    {
+        <p class="col-sm-8 p-0">Kindly create at least one (1) card type to use this feature.</p>
+    }
+    else
+    {
+        <EditForm EditContext="@EditContext" OnValidSubmit="@Submit">
+            <DataAnnotationsValidator />
+
+            @if (Errors.Any())
+            {
+                <ul class="validation-errors">
+                    @foreach (var error in Errors)
+                    {
+                        <li class="validation-message">@error</li>
+                    }
+                </ul>
+            }
+
+            <div class="form-group row">
+                <label for="id" class="col-sm-2 col-form-label">Card Number</label>
+                <div class="col-sm-6">
+                    <div class="d-flex">
+                        <span class="flex-fill">
+                            <InputText id="number"
+                                       class="form-control"
+                                       placeholder="Scan card or enter card id manually..."
+                                       autofocus
+                                       @bind-Value="Model.CardNumberAsString"></InputText>
+                        </span>
+                        <span class="d-inline-flex p-2">
+                            <a href="" @onclick="GenerateCardNumber" @onclick:preventDefault>Generate</a>
+                        </span>
+                    </div>
+                    <ValidationMessage For="@(() => Model.CardNumber)"></ValidationMessage>
+                </div>
+            </div>
+
+            <div class="form-group row">
+                <label for="fareScheme" class="col-sm-2 col-form-label">Type</label>
+                <div class="col-sm-4">
+                    <InputSelectGuid id="type"
+                                     class="form-control"
+                                     placeholder="Type"
+                                     @bind-Value="Model.CardTypeId">
+                        @foreach (var cardTypeOption in CardTypeOptions)
+                            {
+                            <option value="@cardTypeOption.Id">@cardTypeOption.Name</option>
+                            }
+                    </InputSelectGuid>
+                    <ValidationMessage For="@(() => Model.CardTypeId)"></ValidationMessage>
+                </div>
+            </div>
+
+            @if ((SelectedCardType = CardTypeOptions.SingleOrDefault(c => c.Id == Model.CardTypeId && c.Privileges.Any())) != null)
+            {
+                <div class="form-group row">
+                    <label for="fareScheme" class="col-sm-2 col-form-label">Privilege Type</label>
+                    <div class="col-sm-4">
+                        <InputSelectGuid id="privilegeType"
+                                         class="form-control"
+                                         placeholder="Privilege Type"
+                                         @bind-Value="Model.PrivilegeIdAsString">
+                            @foreach (var privilege in SelectedCardType.Privileges)
+                                    {
+                                <option value="@privilege.Id">@privilege.Name</option>
+                                    }
+                        </InputSelectGuid>
+                        <ValidationMessage For="@(() => Model.PrivilegeId)"></ValidationMessage>
+                    </div>
+                </div>
+
+                @if ((SelectedPrivilege = SelectedCardType.Privileges.SingleOrDefault(p => p.Id == Model.PrivilegeId)) != null)
+                {
+                    <div class="form-group row">
+                        <label for="id" class="col-sm-2 col-form-label">Privilege Card Number</label>
+                        <div class="col-sm-6">
+                            <InputText id="privilegeCardNumber"
+                                       class="form-control"
+                                       placeholder="Privilege Card Number"
+                                       @bind-Value="Model.PrivilegeCardNumber" />
+                            <ValidationMessage For="@(() => Model.PrivilegeCardNumber)"></ValidationMessage>
+                        </div>
+                    </div>
+                }
+            }
+            <hr class="col-sm-8" align="left" />
+            <div class="col-md-8 text-right">
+                <button class="btn btn-primary" type="submit">Submit</button>
+            </div>
+        </EditForm>
+    }
+
+    @* Toasts *@
+    <div id="snackbar">Card successfully activated!</div>
+</div>
+
+@code {
+    private EditContext EditContext { get; set; }
+    private ActivateModel Model { get; set; }
+    private ValidationMessageStore MessageStore { get; set; }
+    private CardType SelectedCardType { get; set; }
+    private Privilege SelectedPrivilege { get; set; }
+    private List<CardType> CardTypeOptions { get; set; }
+    private List<String> Errors { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Model = new ActivateModel();
+        Errors = new List<String>();
+        EditContext = new EditContext(Model);
+        MessageStore = new ValidationMessageStore(EditContext);
+        CardTypeOptions = (await AdministratorService.GetCardTypesAsync()).ToList();
+
+        EditContext.OnValidationRequested += OnValidationRequested;
+
+        base.OnInitialized();
+    }
+    private void GenerateCardNumber()
+    {
+        Model.CardNumberAsString = Guid.NewGuid().ToString();
+        MessageStore.Clear();
+    }
+    private async Task Submit()
+    {
+        try
+        {
+            Errors.Clear();
+            TicketingBusinessRules.Activate(
+                Model.CardNumber,
+                Model.CardTypeId,
+                Model.PrivilegeId,
+                Model.PrivilegeCardNumber);
+            Model.CardNumberAsString = string.Empty;
+            Model.PrivilegeCardNumber = string.Empty;
+
+            await JsRuntime.InvokeVoidAsync("showToastNofification");
+        }
+        catch (Exception ex)
+        {
+            EntityFrameworkDbContext.DetachAllEntities();
+            Errors.Add(ex.Message);
+        }
+    }
+    private void OnValidationRequested(object sender, ValidationRequestedEventArgs e)
+    {
+        MessageStore.Clear();
+
+        if (SelectedCardType != null)
+        {
+            if (Model.PrivilegeId == Guid.Empty)
+            {
+                MessageStore.Add(() => Model.PrivilegeId, "Privilege is required for the selected card type.");
+            }
+
+            if (SelectedPrivilege != null)
+            {
+                if (string.IsNullOrWhiteSpace(Model.PrivilegeCardNumber) || (
+                    !string.IsNullOrWhiteSpace(SelectedPrivilege.IdentificationNumberPattern) &&
+                    !Regex.Match(Model.PrivilegeCardNumber, SelectedPrivilege.IdentificationNumberPattern).Success))
+                {
+                    MessageStore.Add(() => Model.PrivilegeCardNumber, "Privilege card number is in wrong format.");
+                }
+
+            }
+        }
+    }
+
+    // Nested Classes
+    class ActivateModel
+    {
+        public string CardNumberAsString
+        {
+            get => CardNumber != Guid.Empty ? CardNumber.ToString() : null;
+            set => CardNumber = Guid.TryParse(value, out var parsed) ? parsed : Guid.Empty;
+        }
+        public string PrivilegeIdAsString
+        {
+            get => PrivilegeId.ToString();
+            set => PrivilegeId = Guid.TryParse(value, out var parsed) ? parsed : Guid.Empty;
+        }
+
+        [RegularExpression(
+            "^((?!00000000-0000-0000-0000-000000000000).)*$",
+            ErrorMessage = "Card number must be a valid guid format.")]
+        [Required]
+        public Guid CardNumber { get; set; }
+
+        [RegularExpression(
+            "^((?!00000000-0000-0000-0000-000000000000).)*$",
+            ErrorMessage = "Please select a card type.")]
+        [Required]
+        public Guid CardTypeId { get; set; }
+
+        public Guid PrivilegeId { get; set; }
+        public string PrivilegeCardNumber { get; set; }
+    }
+}

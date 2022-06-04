@@ -1,0 +1,114 @@
+﻿@page "/check-balance"
+
+@using QLESS.Core.BusinessRules
+@using QLESS.Core.Data.EntityFramework 
+@using Microsoft.AspNetCore.Components.Forms
+@inject PassengerServicesDbContext EntityFrameworkDbContext
+@inject TicketingBusinessRules TicketingBusinessRules
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JsRuntime
+
+<div class="mb-3 col-sm-12">
+    <h3>Check Balance</h3>
+    <hr class="col-sm-12" align="left" />
+
+    <EditForm EditContext="@EditContext">
+        <DataAnnotationsValidator />
+
+        <div class="form-group row">
+            <label for="id" class="col-sm-2 col-form-label">Card Number</label>
+            <div class="col-sm-6">
+                <InputText id="number"
+                           class="form-control"
+                           placeholder="Scan card or enter card id manually..."
+                           autofocus
+                           @oninput="@OnInput"
+                           Value="@Model.CardNumberAsString"
+                           ValueExpression="() => Model.CardNumberAsString"></InputText>
+                <ValidationMessage For="@(() => Model.CardNumber)"></ValidationMessage>
+            </div>
+        </div>
+
+        @if (Model.CardNumber != Guid.Empty)
+        {
+            <div class="row">
+                <p class="h1 col-sm-8">You card's balance is</p>
+                <div class="display-1 col-sm-8">
+                    Php@(Model.Balance.ToString("C"))
+                </div>
+                @if (Model.Expiry.HasValue)
+                {
+                    <p class="h1 col-sm-8">You card will expire on @(Model.Expiry.Value.ToString("MMMM dd, yyyy")).</p>
+                }
+                else
+                {
+                    <p class="h1 col-sm-8">You card has no expiry.</p>
+                }
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <p class="h1 col-sm-8 p-0 validation-message">@Error</p>
+        }
+
+    </EditForm>
+</div>
+
+@code {
+    private EditContext EditContext { get; set; }
+    private Guid MyProperty { get; set; }
+    private CardModel Model { get; set; }
+    private string Error { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Model = new CardModel();
+        EditContext = new EditContext(Model);
+    }
+    private async Task OnInput(ChangeEventArgs args)
+    {
+        try
+        {
+            Error = string.Empty;
+            if (Guid.TryParse(args.Value.ToString(), out var parsed))
+            {
+                Model.CardNumber = parsed;
+                var model = TicketingBusinessRules.CheckBalance(Model.CardNumber);
+                Model.Balance = model.Balance;
+                Model.Expiry = model.Expiry;
+
+                await Task.Delay(5000);
+                Model.CardNumber = Guid.Empty;
+            }
+            else
+            {
+                Model.CardNumber = Guid.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+            Model.CardNumber = Guid.Empty;
+        }
+    }
+
+    // Nested Classes
+    class CardModel
+    {
+        public string CardNumberAsString
+        {
+            get => CardNumber != Guid.Empty ? CardNumber.ToString() : null;
+            set => CardNumber = Guid.TryParse(value, out var parsed) ? parsed : Guid.Empty;
+        }
+
+        [RegularExpression(
+            "^((?!00000000-0000-0000-0000-000000000000).)*$",
+            ErrorMessage = "Card number must be a valid guid format.")]
+        [Required]
+        public Guid CardNumber { get; set; }
+
+        public decimal Balance { get; set; }
+        public DateTime? Expiry { get; set; }
+    }
+}

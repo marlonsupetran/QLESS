@@ -1,0 +1,213 @@
+﻿@page "/reload"
+
+@using QLESS.Core.BusinessRules
+@inject TicketingBusinessRules TicketingBusinessRules
+
+<div class="mb-3 col-sm-12">
+    <h3>Reload</h3>
+    <hr class="col-sm-12" align="left" />
+
+    <EditForm EditContext="@EditContext">
+        <DataAnnotationsValidator />
+
+        @if (Model.CardNumber == Guid.Empty)
+        {
+            <div class="form-group row">
+                <label for="id" class="col-sm-2 col-form-label">Card Number</label>
+                <div class="col-sm-6">
+                    <InputText id="number"
+                               class="form-control"
+                               placeholder="Scan card or enter card id manually..."
+                               autofocus
+                               @oninput="@OnInput"
+                               Value="@Model.CardNumberAsString"
+                               ValueExpression="() => Model.CardNumberAsString"></InputText>
+                </div>
+            </div>
+        }
+
+        @if (Model.CardNumber != Guid.Empty && Model.Amount == 0)
+        {
+            <fieldset>
+                <legend>Select amount to reload</legend>
+                @foreach (var amount in Amounts)
+                {
+                    <button type="button"
+                            class="btn btn-primary btn-lg"
+                            @onclick="@((e) => OnAmountButtonClicked(amount))">
+                        @amount.ToString()
+                    </button>
+                }
+            </fieldset>
+            <hr class="col-sm-8" align="left" />
+            <div class="col-md-8 text-right">
+                <button class="btn btn-primary" @onclick="@((e) => BackToStartClicked())">Back</button>
+            </div>
+        }
+
+        @if (Model.CardNumber != Guid.Empty && Model.Amount != 0 && Model.Payment == 0)
+        {
+            <fieldset>
+                <legend>Select payment amount</legend>
+                @foreach (var denomination in Denominations)
+                {
+                    <button type="button"
+                            class="btn btn-primary btn-lg"
+                            disabled="@(denomination < Model.Amount)"
+                            @onclick="((e) => OnDenominationsButtonClicked(denomination))">
+                        @denomination.ToString()
+                    </button>
+                }
+            </fieldset>
+            <hr class="col-sm-8" align="left" />
+            <div class="col-md-8 text-right">
+                <button class="btn btn-primary" @onclick="@((e) => BackToAmountClicked())">Back</button>
+            </div>
+        }
+
+        @if (Model.CardNumber != Guid.Empty && Model.Amount != 0 && Model.Payment != 0 && !Model.IsReloadSuccessful)
+        {
+            <div class="row">
+                <p class="h1 col-sm-8">You are about to reload</p>
+                <div class="display-1 col-sm-8">
+                    Php@(Model.Amount.ToString("C"))
+                </div>
+            </div>
+            <hr class="col-sm-8" align="left" />
+            <div class="col-md-8 text-right">
+                <button class="btn btn-primary" @onclick="@((e) => BackToPaymentClicked())">Back</button>
+                <button class="btn btn-primary" @onclick="@((e) => ContinueClicked())">Continue</button>
+            </div>
+        }
+
+        @if (Model.CardNumber != Guid.Empty && Model.Amount != 0 && Model.Payment != 0 && Model.IsReloadSuccessful)
+        {
+            <div class="row">
+                <p class="h1 col-sm-8">Reload successful! You new balance is</p>
+                <div class="display-1 col-sm-8">
+                    Php@(Model.Balance.ToString("C"))
+                </div>
+                <p class="h1 col-sm-8">You're change is Php@(Model.Change.ToString("C"))</p>
+            </div>
+            <hr class="col-sm-8" align="left" />
+            <div class="col-md-8 text-right">
+                <button class="btn btn-primary" @onclick="@((e) => DoneClicked())">Done</button>
+            </div>
+        }
+
+        @if (!string.IsNullOrWhiteSpace(Error))
+        {
+            <p class="h1 col-sm-8 p-0 validation-message">@Error</p>
+        }
+
+    </EditForm>
+</div>
+
+@code {
+    private EditContext EditContext { get; set; }
+    private ReloadModel Model { get; set; }
+    private List<decimal> Amounts;
+    private List<decimal> Denominations;
+    private string Error;
+
+    protected override void OnInitialized()
+    {
+        Amounts = new List<decimal>(new[] { 100M, 200M, 500M, 1000M });
+        Denominations = new List<decimal>(new[] { 50M, 100M, 200M, 500M, 1000M });
+        Model = new ReloadModel();
+        EditContext = new EditContext(Model);
+
+        base.OnInitialized();
+    }
+    private void OnInput(ChangeEventArgs args)
+    {
+        try
+        {
+            Error = string.Empty;
+            if (Guid.TryParse(args.Value.ToString(), out var parsed))
+            {
+                Model.CardNumber = parsed;
+                var model = TicketingBusinessRules.CheckBalance(Model.CardNumber);
+                Model.Balance = model.Balance;
+            }
+            else
+            {
+                Model.CardNumber = Guid.Empty;
+            }
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+            Model.CardNumber = Guid.Empty;
+        }
+    }
+    private void OnAmountButtonClicked(decimal amount)
+    {
+        Model.Amount = amount;
+    }
+    private void OnDenominationsButtonClicked(decimal denomination)
+    {
+        Model.Payment = denomination;
+    }
+    private async Task ContinueClicked()
+    {
+        try
+        {
+            var model = TicketingBusinessRules.Reload(Model.CardNumber, Model.Amount, Model.Payment);
+            Model.Change = model.Change;
+            Model.Balance = model.Balance;
+            Model.IsReloadSuccessful = true;
+
+            await Task.Delay(5000);
+            if (Model.IsReloadSuccessful)
+            {
+                Model = new ReloadModel();
+                EditContext = new EditContext(Model); 
+            }
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+            Model.IsReloadSuccessful = false;
+        }
+    }
+    private void DoneClicked()
+    {
+        Model = new ReloadModel();
+        EditContext = new EditContext(Model);
+    }
+    private void BackToStartClicked()
+    {
+        Model.CardNumber = Guid.Empty;
+    }
+    private void BackToAmountClicked()
+    {
+        Model.Amount = 0;
+    }
+    private void BackToPaymentClicked()
+    {
+        Model.Payment = 0;
+    }
+
+    // Nested Classes
+    class ReloadModel
+    {
+        public string CardNumberAsString
+        {
+            get => CardNumber != Guid.Empty ? CardNumber.ToString() : null;
+            set => CardNumber = Guid.TryParse(value, out var parsed) ? parsed : Guid.Empty;
+        }
+
+        [RegularExpression(
+            "^((?!00000000-0000-0000-0000-000000000000).)*$",
+            ErrorMessage = "Card number must be a valid guid format.")]
+        [Required]
+        public Guid CardNumber { get; set; }
+
+        public decimal Balance { get; set; }
+        public decimal Amount { get; set; }
+        public decimal Payment { get; set; }
+        public decimal Change { get; set; }
+        public bool IsReloadSuccessful { get; set; }
+    }
+}

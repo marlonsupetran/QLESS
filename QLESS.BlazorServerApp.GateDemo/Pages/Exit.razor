@@ -1,0 +1,87 @@
+﻿@page "/exit"
+
+@using QLESS.Core.BusinessRules
+@inject GateBusinessRules GateBusinessRules
+@inject IJSRuntime JsRuntime
+
+<div class="mb-3 col-sm-12">
+    <h3>Gate Exit Demo</h3>
+    <hr class="col-sm-12" />
+
+    <EditForm EditContext="@EditContext">
+        <DataAnnotationsValidator />
+
+        <div class="form-group row">
+            <label for="id" class="col-sm-2 col-form-label">Card Number</label>
+            <div class="col-sm-6">
+                <InputText id="number"
+                           class="form-control"
+                           placeholder="Scan card or enter card id manually..."
+                           autofocus
+                           @oninput="@OnInput"
+                           Value="@Model.CardNumberAsString"
+                           ValueExpression="() => Model.CardNumberAsString"></InputText>
+                <ValidationMessage For="@(() => Model.CardNumber)"></ValidationMessage>
+            </div>
+        </div>
+    </EditForm>
+
+    @* Error *@
+    @if (!string.IsNullOrWhiteSpace(Error))
+    {
+        <p class="h1 col-sm-8 p-0 validation-message">@Error</p>
+    }
+
+    @* Toasts *@
+    <div id="snackbar">Card successfully checked-out!</div>
+</div>
+
+@code {
+    private EditContext EditContext { get; set; }
+    private CardModel Model { get; set; }
+    private string Error { get; set; }
+
+    protected override void OnInitialized()
+    {
+        Model = new CardModel();
+        EditContext = new EditContext(Model);
+        base.OnInitialized();
+    }
+    private async Task OnInput(ChangeEventArgs args)
+    {
+        try
+        {
+            Error = string.Empty;
+            if (Guid.TryParse(args.Value.ToString(), out var parsed))
+            {
+                GateBusinessRules.Exit(parsed, 0);
+                await JsRuntime.InvokeVoidAsync("showToastNofification");
+            }
+        }
+        catch (Exception ex)
+        {
+            Error = ex.Message;
+        }
+        finally
+        {
+            Model.CardNumberAsString = string.Empty;
+            Model.CardNumber = Guid.Empty;
+        }
+    }
+
+    // Nested Classes
+    class CardModel
+    {
+        public string CardNumberAsString
+        {
+            get => CardNumber != Guid.Empty ? CardNumber.ToString() : null;
+            set => CardNumber = Guid.TryParse(value, out var parsed) ? parsed : Guid.Empty;
+        }
+
+        [RegularExpression(
+            "^((?!00000000-0000-0000-0000-000000000000).)*$",
+            ErrorMessage = "Card number must be a valid guid format.")]
+        [Required]
+        public Guid CardNumber { get; set; }
+    }
+}

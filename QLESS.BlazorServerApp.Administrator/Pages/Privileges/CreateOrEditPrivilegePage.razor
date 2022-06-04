@@ -1,0 +1,104 @@
+﻿@page "/privileges/create"
+@page "/privileges/{id:guid}"
+
+@using QLESS.BlazorServerApp.Administrator.Data
+@using QLESS.BlazorServerApp.Administrator.Models
+@using QLESS.Core.BusinessRules
+@using Microsoft.AspNetCore.Components.Forms
+@inject AdministratorService AdministratorService
+@inject AdministratorBusinessRules AdministratorBusinessRules
+@inject NavigationManager NavigationManager
+
+<div class="mb-3">
+    <h3>@(PrivilegeModel.Id == Guid.Empty ? "Create New" : "Edit") Privilege</h3>
+    <hr class="col-sm-12" align="left" />
+    <EditForm EditContext="@EditContext" OnValidSubmit="@Submit">
+        <DataAnnotationsValidator />
+
+        @if (Errors.Any())
+        {
+            <ul class="validation-errors">
+                @foreach (var error in Errors)
+                {
+                    <li class="validation-message">@error</li>
+                }
+            </ul>
+        }
+
+        <div class="form-group row">
+            <label for="name" class="col-sm-2 col-form-label">Name</label>
+            <div class="col-sm-6">
+                <InputText id="name"
+                           class="form-control"
+                           placeholder="Name"
+                           @bind-Value="PrivilegeModel.Name" />
+                <ValidationMessage For="@(() => PrivilegeModel.Name)"></ValidationMessage>
+            </div>
+        </div>
+        <div class="form-group row">
+            <label for="description" class="col-sm-2 col-form-label">Description</label>
+            <div class="col-sm-6">
+                <InputText id="description"
+                           class="form-control"
+                           placeholder="Description"
+                           @bind-Value="PrivilegeModel.Description" />
+                <ValidationMessage For="@(() => PrivilegeModel.Description)"></ValidationMessage>
+            </div>
+        </div>
+        <div class="form-group row">
+            <label for="identificationNumberPattern" class="col-sm-2 col-form-label">Identification Number Pattern</label>
+            <div class="col-sm-6">
+                <InputText id="identificationNumberPattern"
+                           class="form-control"
+                           placeholder="Identification Number Pattern"
+                           @bind-Value="@PrivilegeModel.IdentificationNumberPattern" />
+                <ValidationMessage For="@(() => PrivilegeModel.IdentificationNumberPattern)"></ValidationMessage>
+            </div>
+        </div>
+        <hr class="col-sm-8" align="left" />
+        <div class="col-md-8 text-right">
+            <button class="btn btn-primary" type="submit">@(PrivilegeModel.Id == Guid.Empty ? "Submit" : "Save")</button>
+        </div>
+    </EditForm>
+</div>
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    private EditContext EditContext { get; set; }
+    private PrivilegeModel PrivilegeModel { get; set; }
+    private List<String> Errors { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        PrivilegeModel = new PrivilegeModel();
+
+        if (Id != Guid.Empty)
+        {
+            var privilege = await AdministratorService.GetPrivilege(Id);
+            PrivilegeModel.Id = privilege.Id;
+            PrivilegeModel.Name = privilege.Name;
+            PrivilegeModel.Description = privilege.Description;
+            PrivilegeModel.IdentificationNumberPattern = privilege.IdentificationNumberPattern;
+        }
+
+        EditContext = new EditContext(PrivilegeModel);
+        Errors = new List<String>();
+
+        base.OnInitialized();
+    }
+    private void Submit()
+    {
+        try
+        {
+            Errors.Clear();
+            AdministratorBusinessRules.CreateOrEditPriviledge(PrivilegeModel);
+            NavigationManager.NavigateTo("/privileges");
+        }
+        catch (Exception ex)
+        {
+            Errors.Add(ex.Message);
+        }
+    }
+}

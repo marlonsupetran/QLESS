@@ -1,0 +1,82 @@
+﻿@page "/card-types"
+
+@using QLESS.BlazorServerApp.Administrator.Data
+@using QLESS.Core.Entities
+@inject AdministratorService AdministratorService
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JsRuntime
+
+<div class="mb-3">
+
+    <h3>Card Types</h3>
+    @if (CardTypes == null)
+    {
+        <hr />
+        <p class="text-center"><em>Loading...</em></p>
+    }
+    else if (!CardTypes.Any())
+    {
+        <hr />
+        <p class="text-center">No records found.</p>
+    }
+    else
+    {
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Validity</th>
+                    <th />
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var cardType in CardTypes)
+                {
+                    <tr>
+                        <td>@cardType.Name</td>
+                        <td>@cardType.Description</td>
+                        @{ 
+                            var validityOptions = AdministratorService.ValidityOptions.SingleOrDefault(o => o.Value == cardType.Validity);
+                            var validity = !validityOptions.Equals(default(KeyValuePair<string, long>)) ? validityOptions.Key : "Non-expiring";
+                            <td>@validity</td>
+                        }
+                        <td>
+                            <div class="text-right">
+                                <a class="edit" href="/card-types/@cardType.Id">Edit</a>
+                                &nbsp;
+                                <a class="delete" href="" @onclick="@(e =>DeleteCardType(cardType))" @onclick:preventDefault>Delete</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    <hr />
+    <div class="col-md-12 text-right">
+        <button class="btn btn-primary" @onclick=@Navigate>Create new</button>
+    </div>
+</div>
+
+@code {
+    private CardType[] CardTypes;
+
+    protected override async Task OnInitializedAsync()
+    {
+        CardTypes = await AdministratorService.GetCardTypesAsync();
+    }
+    private async Task DeleteCardType(CardType cardType)
+    {
+        bool confirmed = await JsRuntime.InvokeAsync<bool>("confirm", $"Are you sure you want to delete '{cardType.Name}'?");
+        if (confirmed)
+        {
+            AdministratorService.DeleteCardType(cardType.Id);
+            CardTypes = await AdministratorService.GetCardTypesAsync();
+        }
+    }
+    private void Navigate()
+    {
+        NavigationManager.NavigateTo("/card-types/new");
+    }
+}
